@@ -199,19 +199,30 @@ impl GitHostProvider for GitHubProvider {
         // Check auth first
         self.check_auth().await?;
 
-        // Get owner/repo from the remote URL using gh CLI.
-        // This is critical for fork workflows: the remote_url should be the upstream repo,
-        // not the fork, so the PR is created against the correct repository.
-        let repo_info = self.get_repo_info_from_url(remote_url, repo_path).await?;
+        // Get owner/repo from the remote URL (target repo for the PR).
+        let target_repo_info = self.get_repo_info_from_url(remote_url, repo_path).await?;
+
+        // For cross-fork PRs, get the head repo info to format head_branch as "owner:branch".
+        let head_branch = if let Some(head_url) = &request.head_repo_url {
+            let head_repo_info = self.get_repo_info_from_url(head_url, repo_path).await?;
+            if head_repo_info.owner != target_repo_info.owner {
+                format!("{}:{}", head_repo_info.owner, request.head_branch)
+            } else {
+                request.head_branch.clone()
+            }
+        } else {
+            request.head_branch.clone()
+        };
 
         let cli = self.gh_cli.clone();
-        let request_clone = request.clone();
+        let mut request_clone = request.clone();
+        request_clone.head_branch = head_branch;
 
         (|| async {
             let cli = cli.clone();
             let request = request_clone.clone();
-            let owner = repo_info.owner.clone();
-            let repo_name = repo_info.repo_name.clone();
+            let owner = target_repo_info.owner.clone();
+            let repo_name = target_repo_info.repo_name.clone();
 
             let cli_result =
                 task::spawn_blocking(move || cli.create_pr(&request, &owner, &repo_name))
