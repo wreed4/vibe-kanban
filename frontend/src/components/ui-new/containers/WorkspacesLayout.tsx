@@ -26,6 +26,7 @@ import { CreateChatBoxContainer } from '@/components/ui-new/containers/CreateCha
 import { NavbarContainer } from '@/components/ui-new/containers/NavbarContainer';
 import { PreviewBrowserContainer } from '@/components/ui-new/containers/PreviewBrowserContainer';
 import { PreviewControlsContainer } from '@/components/ui-new/containers/PreviewControlsContainer';
+import { TerminalPanelContainer } from '@/components/ui-new/containers/TerminalPanelContainer';
 import { useRenameBranch } from '@/hooks/useRenameBranch';
 import { repoApi } from '@/lib/api';
 import { useDiffStream } from '@/hooks/useDiffStream';
@@ -155,6 +156,7 @@ export function WorkspacesLayout() {
     isChangesMode,
     isLogsMode,
     isPreviewMode,
+    isTerminalMode,
     setChangesMode,
     setLogsMode,
     resetForCreateMode,
@@ -312,16 +314,16 @@ export function WorkspacesLayout() {
   // Ref to Allotment for programmatic control
   const allotmentRef = useRef<AllotmentHandle>(null);
 
-  // Reset Allotment sizes when changes, logs, or preview panel becomes visible
+  // Reset Allotment sizes when changes, logs, preview, or terminal panel becomes visible
   // This re-applies preferredSize percentages based on current window size
   useEffect(() => {
     if (
-      (isChangesMode || isLogsMode || isPreviewMode) &&
+      (isChangesMode || isLogsMode || isPreviewMode || isTerminalMode) &&
       allotmentRef.current
     ) {
       allotmentRef.current.reset();
     }
-  }, [isChangesMode, isLogsMode, isPreviewMode]);
+  }, [isChangesMode, isLogsMode, isPreviewMode, isTerminalMode]);
 
   // Reset changes and logs mode when entering create mode
   useEffect(() => {
@@ -332,10 +334,16 @@ export function WorkspacesLayout() {
 
   // Show sidebar when no panel is open
   useEffect(() => {
-    if (!isChangesMode && !isLogsMode && !isPreviewMode) {
+    if (!isChangesMode && !isLogsMode && !isPreviewMode && !isTerminalMode) {
       setSidebarVisible(true);
     }
-  }, [isChangesMode, isLogsMode, isPreviewMode, setSidebarVisible]);
+  }, [
+    isChangesMode,
+    isLogsMode,
+    isPreviewMode,
+    isTerminalMode,
+    setSidebarVisible,
+  ]);
 
   // Command bar keyboard shortcut (CMD+K)
   const handleOpenCommandBar = useCallback(() => {
@@ -549,6 +557,18 @@ export function WorkspacesLayout() {
       );
     }
 
+    if (isTerminalMode) {
+      // In terminal mode, just show the git panel (terminal is in center pane)
+      return (
+        <GitPanelContainer
+          selectedWorkspace={selectedWorkspace}
+          repos={repos}
+          repoInfos={repoInfos}
+          onBranchNameChange={handleBranchNameChange}
+        />
+      );
+    }
+
     return (
       <GitPanelContainer
         selectedWorkspace={selectedWorkspace}
@@ -629,7 +649,9 @@ export function WorkspacesLayout() {
         <Allotment.Pane
           minSize={300}
           preferredSize={changesPanelWidth}
-          visible={isChangesMode || isLogsMode || isPreviewMode}
+          visible={
+            isChangesMode || isLogsMode || isPreviewMode || isTerminalMode
+          }
         >
           <div className="h-full overflow-hidden">
             {isChangesMode && (
@@ -652,6 +674,7 @@ export function WorkspacesLayout() {
             {isPreviewMode && (
               <PreviewBrowserContainer attemptId={selectedWorkspace?.id} />
             )}
+            {isTerminalMode && <TerminalPanelContainer />}
           </div>
         </Allotment.Pane>
 
